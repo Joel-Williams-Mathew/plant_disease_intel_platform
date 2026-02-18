@@ -10,15 +10,34 @@ import OrchestrationPanel from './components/panels/OrchestrationPanel';
 import RecommendationPanel from './components/panels/RecommendationPanel';
 
 const pageConfig = {
-  dashboard: { title: 'Disease Intelligence Dashboard', subtitle: 'Real-time multi-agent monitoring & analysis' },
-  vision: { title: 'Vision Detection Agent', subtitle: 'CNN-based leaf disease classification & analysis' },
-  climate: { title: 'Climate Risk Agent', subtitle: 'Weather-based outbreak prediction engine' },
-  satellite: { title: 'Satellite Health Agent', subtitle: 'NDVI & vegetation stress analysis' },
-  orchestration: { title: 'Orchestration Engine', subtitle: 'Multi-agent consensus & conflict resolution' },
-  recommendations: { title: 'Action Recommendations', subtitle: 'AI-synthesized intervention strategies' },
+  home: { title: 'Home Dashboard', subtitle: 'Welcome to AgriIntel — your smart farming command center' },
+  market: { title: 'Market Intelligence', subtitle: 'Real-time crop pricing & market trend analysis' },
+  community: { title: 'Community', subtitle: 'Connect with farmers, experts & agronomists' },
+  'dev-planner': { title: 'Dev Planner', subtitle: 'Plan and track your development cycles' },
+  'ai-assistant': { title: 'AI Assistant', subtitle: 'Chat with your intelligent farming advisor' },
+  dashboard: { title: 'Outbreak Analysis', subtitle: 'Real-time multi-agent disease detection & monitoring' },
+  'crop-planning': { title: 'Crop Planning', subtitle: 'Smart crop rotation & seasonal planning' },
+  'roi-calculator': { title: 'ROI Calculator', subtitle: 'Estimate returns on your farming investments' },
+  'econ-dashboard': { title: 'Econ Dashboard', subtitle: 'Economic indicators & farm financial health' },
 };
 
-function DashboardView() {
+// Pages that are fully functional
+const LIVE_PAGES = new Set(['dashboard']);
+
+function ComingSoonView({ title }) {
+  return (
+    <div className="coming-soon-wrapper">
+      <div className="coming-soon-card">
+        <div className="coming-soon-icon">🚧</div>
+        <h2>{title}</h2>
+        <p>This feature is currently under development and will be available soon.</p>
+        <div className="coming-soon-badge">Coming Soon</div>
+      </div>
+    </div>
+  );
+}
+
+function OutbreakAnalysisView() {
   return (
     <>
       <LocationBar />
@@ -37,30 +56,18 @@ function DashboardView() {
   );
 }
 
-function SinglePanelView({ panel }) {
-  return (
-    <>
-      {(panel === 'climate' || panel === 'satellite') && <LocationBar />}
-      <div className="panel-grid">
-        {panel === 'vision' && <VisionAgentPanel />}
-        {panel === 'climate' && <ClimateAgentPanel />}
-        {panel === 'satellite' && <SatelliteAgentPanel />}
-        {panel === 'orchestration' && <OrchestrationPanel />}
-        {panel === 'recommendations' && <RecommendationPanel />}
-      </div>
-    </>
-  );
-}
-
 function AppContent() {
-  const [activeNav, setActiveNav] = useState('dashboard');
+  const [activeNav, setActiveNav] = useState('home');
   const config = pageConfig[activeNav];
 
   return (
     <div className="app-layout">
       <Sidebar activeNav={activeNav} onNavChange={setActiveNav} />
       <MainContent title={config.title} subtitle={config.subtitle}>
-        {activeNav === 'dashboard' ? <DashboardView /> : <SinglePanelView panel={activeNav} />}
+        {activeNav === 'dashboard'
+          ? <OutbreakAnalysisView />
+          : <ComingSoonView title={config.title} />
+        }
       </MainContent>
     </div>
   );
