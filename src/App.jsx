@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AppProvider, useAppState } from './context/AppContext';
+import { AppProvider } from './context/AppContext';
 import Sidebar from './components/layout/Sidebar';
 import MainContent from './components/layout/MainContent';
 import LocationBar from './components/ui/LocationBar';
@@ -8,6 +8,7 @@ import ClimateAgentPanel from './components/panels/ClimateAgentPanel';
 import SatelliteAgentPanel from './components/panels/SatelliteAgentPanel';
 import OrchestrationPanel from './components/panels/OrchestrationPanel';
 import RecommendationPanel from './components/panels/RecommendationPanel';
+import ROICalculator from './components/panels/ROICalculator';
 
 const pageConfig = {
   home: { title: 'Home Dashboard', subtitle: 'Welcome to AgriIntel — your smart farming command center' },
@@ -21,8 +22,8 @@ const pageConfig = {
   'econ-dashboard': { title: 'Econ Dashboard', subtitle: 'Economic indicators & farm financial health' },
 };
 
-// Pages that are fully functional
-const LIVE_PAGES = new Set(['dashboard']);
+// Added 'roi-calculator' to the LIVE_PAGES set
+const LIVE_PAGES = new Set(['dashboard', 'roi-calculator']);
 
 function ComingSoonView({ title }) {
   return (
@@ -60,14 +61,29 @@ function AppContent() {
   const [activeNav, setActiveNav] = useState('home');
   const config = pageConfig[activeNav];
 
+  // Helper function to handle conditional rendering of panels
+  const renderPanel = () => {
+    // If the page isn't marked as "Live", show Coming Soon immediately
+    if (!LIVE_PAGES.has(activeNav)) {
+      return <ComingSoonView title={config.title} />;
+    }
+
+    // Render the specific component for live pages
+    switch (activeNav) {
+      case 'dashboard':
+        return <OutbreakAnalysisView />;
+      case 'roi-calculator':
+        return <ROICalculator />;
+      default:
+        return <ComingSoonView title={config.title} />;
+    }
+  };
+
   return (
     <div className="app-layout">
       <Sidebar activeNav={activeNav} onNavChange={setActiveNav} />
       <MainContent title={config.title} subtitle={config.subtitle}>
-        {activeNav === 'dashboard'
-          ? <OutbreakAnalysisView />
-          : <ComingSoonView title={config.title} />
-        }
+        {renderPanel()}
       </MainContent>
     </div>
   );
