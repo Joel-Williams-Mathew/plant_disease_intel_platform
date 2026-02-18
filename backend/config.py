@@ -3,8 +3,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+print(f"DEBUG: CWD = {os.getcwd()}")
+print(f"DEBUG: .env exists = {os.path.exists('.env')}")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-HF_API_TOKEN = os.getenv("HF_API_TOKEN", "")
+print(f"DEBUG: GROQ_API_KEY loaded = {'Yes' if GROQ_API_KEY else 'No'}")
+
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 HF_VISION_MODEL = os.getenv(
     "HF_VISION_MODEL",

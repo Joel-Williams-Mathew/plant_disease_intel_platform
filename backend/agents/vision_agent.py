@@ -1,11 +1,33 @@
 """
 Vision Detection Agent
-Uses Hugging Face Inference API to classify plant diseases from leaf images.
+Uses local Hugging Face Transformers model to classify plant diseases from leaf images.
 """
 
 from datetime import datetime
-import httpx
-from config import HF_API_TOKEN, HF_VISION_MODEL
+import io
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, AutoModelForImageClassification
+from config import HF_VISION_MODEL
+
+# Global cache for model and processor
+_model = None
+_processor = None
+
+
+def get_model():
+    """Lazy load the model and processor on first request."""
+    global _model, _processor
+    if _model is None:
+        print(f"Loading vision model: {HF_VISION_MODEL}...")
+        try:
+            _processor = AutoImageProcessor.from_pretrained(HF_VISION_MODEL)
+            _model = AutoModelForImageClassification.from_pretrained(HF_VISION_MODEL)
+            print("Vision model loaded successfully.")
+        except Exception as e:
+            print(f"Error loading vision model: {e}")
+            raise e
+    return _model, _processor
 
 
 # ── Severity heuristic based on confidence ──
@@ -27,65 +49,58 @@ def _clean_label(label: str) -> str:
     return parts.title()
 
 
-def _detect_content_type(image_bytes: bytes) -> str:
-    """Detect image content type from magic bytes."""
-    if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
-        return "image/png"
-    if image_bytes[:2] == b'\xff\xd8':
-        return "image/jpeg"
-    if image_bytes[:4] == b'RIFF' and image_bytes[8:12] == b'WEBP':
-        return "image/webp"
-    return "image/jpeg"  # default fallback
-
-
 async def analyze_image(image_bytes: bytes) -> dict:
     """
-    Send an image to the Hugging Face plant disease model and return
-    structured classification results.
+    Classify plant disease using local Hugging Face model.
     """
-    if not HF_API_TOKEN:
-        raise ValueError("HF_API_TOKEN is not set. Please add it to your .env file.")
+    try:
+        model, processor = get_model()
 
-    api_url = f"https://api-inference.huggingface.co/models/{HF_VISION_MODEL}"
-    content_type = _detect_content_type(image_bytes)
+        # Load image from bytes
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
-            api_url,
-            content=image_bytes,
-            headers={
-                "Authorization": f"Bearer {HF_API_TOKEN}",
-                "Content-Type": content_type,
-            },
-        )
-        response.raise_for_status()
-        results = response.json()
+        # Preprocess
+        inputs = processor(images=image, return_tensors="pt")
 
-    if not results or not isinstance(results, list):
+        # Inference
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits = outputs.logits
+            probs = torch.nn.functional.softmax(logits, dim=-1)
+
+        # Get top 5 predictions
+        top_probs, top_indices = torch.topk(probs, 5)
+        
+        top_predictions = []
+        for score, idx in zip(top_probs[0], top_indices[0]):
+            label = model.config.id2label[idx.item()]
+            top_predictions.append({
+                "label": _clean_label(label),
+                "confidence": round(score.item() * 100, 2),
+            })
+
+        if not top_predictions:
+            return {
+                "disease_name": "No result",
+                "confidence": 0.0,
+                "severity_stage": "Unknown",
+                "top_predictions": [],
+                "analyzed_at": datetime.now().strftime("%Y-%m-%d %I:%M %p"),
+            }
+
+        top = top_predictions[0]
+
         return {
-            "disease_name": "No result",
-            "confidence": 0.0,
-            "severity_stage": "Unknown",
-            "top_predictions": [],
+            "disease_name": top["label"],
+            "confidence": top["confidence"],
+            "severity_stage": _estimate_severity(top["confidence"]),
+            "top_predictions": top_predictions,
             "analyzed_at": datetime.now().strftime("%Y-%m-%d %I:%M %p"),
         }
 
-    # Build top predictions list
-    top_predictions = []
-    for r in results[:5]:
-        top_predictions.append({
-            "label": _clean_label(r["label"]),
-            "confidence": round(r["score"] * 100, 2),
-        })
+    except Exception as e:
+        print(f"Vision analysis failed: {e}")
+        # Return a graceful error structure or re-raise
+        raise ValueError(f"Model inference failed: {str(e)}")
 
-    top = results[0]
-    confidence = round(top["score"] * 100, 2)
-
-    return {
-        "disease_name": _clean_label(top["label"]),
-        "confidence": confidence,
-        "severity_stage": _estimate_severity(confidence),
-        "top_predictions": top_predictions,
-        "analyzed_at": datetime.now().strftime("%Y-%m-%d %I:%M %p"),
-    }
 
