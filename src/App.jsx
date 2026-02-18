@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { auth } from './services/firebase'; // Ensure this file exists with your API key
+import { onAuthStateChanged } from 'firebase/auth';
 import { AppProvider } from './context/AppContext';
 import Sidebar from './components/layout/Sidebar';
 import MainContent from './components/layout/MainContent';
@@ -9,6 +11,7 @@ import SatelliteAgentPanel from './components/panels/SatelliteAgentPanel';
 import OrchestrationPanel from './components/panels/OrchestrationPanel';
 import RecommendationPanel from './components/panels/RecommendationPanel';
 import ROICalculator from './components/panels/ROICalculator';
+import LoginPage from './components/panels/LoginPage'; // New Import
 
 const pageConfig = {
   home: { title: 'Home Dashboard', subtitle: 'Welcome to AgriIntel — your smart farming command center' },
@@ -22,7 +25,6 @@ const pageConfig = {
   'econ-dashboard': { title: 'Econ Dashboard', subtitle: 'Economic indicators & farm financial health' },
 };
 
-// Added 'roi-calculator' to the LIVE_PAGES set
 const LIVE_PAGES = new Set(['dashboard', 'roi-calculator']);
 
 function ComingSoonView({ title }) {
@@ -59,16 +61,24 @@ function OutbreakAnalysisView() {
 
 function AppContent() {
   const [activeNav, setActiveNav] = useState('home');
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const config = pageConfig[activeNav];
 
-  // Helper function to handle conditional rendering of panels
+  // Monitor Authentication State
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const renderPanel = () => {
-    // If the page isn't marked as "Live", show Coming Soon immediately
     if (!LIVE_PAGES.has(activeNav)) {
       return <ComingSoonView title={config.title} />;
     }
 
-    // Render the specific component for live pages
     switch (activeNav) {
       case 'dashboard':
         return <OutbreakAnalysisView />;
@@ -79,9 +89,24 @@ function AppContent() {
     }
   };
 
+  // 1. Show Spinner while Firebase checks session
+  if (loading) {
+    return (
+      <div className="app-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  // 2. Default View: If no user is logged in, show only the LoginPage
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  // 3. Authenticated View: Show Sidebar and Main Dashboard
   return (
     <div className="app-layout">
-      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} />
+      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} user={user} />
       <MainContent title={config.title} subtitle={config.subtitle}>
         {renderPanel()}
       </MainContent>
